@@ -1,7 +1,12 @@
 <?php
+session_start();
+if (!isset($_SESSION['gebruiker_id'])) {
+    header('Location: ../login.php');
+    exit;
+}
+
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db_connect.php';
-require_once __DIR__ . '/../includes/header.php';
 
 if (!isset($_GET['id'])) {
     header('Location: index.php');
@@ -35,30 +40,61 @@ $stmt->execute([$diplomaId]);
 $resultaten = $stmt->fetchAll();
 ?>
 
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>Diploma Details</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .status-badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .valid { background-color: #22c55e; }
+        .almost { background-color: #f97316; }
+        .expired { background-color: #ef4444; }
+        .revoked { background-color: #6b7280; }
+        .extended { background-color: #3b82f6; }
+        .card h3 { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
 <div class="container">
     <h2>Diploma Details</h2>
+
+    <?php
+        $today = new DateTime();
+        $expiry = new DateTime($diploma['geldig_tot']);
+        $interval = $today->diff($expiry);
+        $verloopt_binnenkort = $expiry > $today && $interval->days <= 60;
+    ?>
+
+    <div>
+        <?php
+        if ($diploma['is_ingetrokken']) {
+            echo '<span class="status-badge revoked">Ingetrokken</span>';
+        } elseif ($diploma['is_verlengd']) {
+            echo '<span class="status-badge extended">Verlengd</span>';
+        } elseif ($expiry < $today) {
+            echo '<span class="status-badge expired">Verlopen</span>';
+        } elseif ($verloopt_binnenkort) {
+            echo '<span class="status-badge almost">Verloopt bijna</span>';
+        } else {
+            echo '<span class="status-badge valid">Geldig</span>';
+        }
+        ?>
+    </div>
 
     <div class="card" style="margin-bottom: 30px;">
         <h3><?= htmlspecialchars($diploma['diploma_type_naam']) ?></h3>
 
         <div class="detail-group"><strong>Diploma Nummer:</strong> <?= htmlspecialchars($diploma['diploma_nummer']) ?></div>
-
-        <div class="detail-group"><strong>Status:</strong>
-            <?php 
-            $today = new DateTime();
-            $expiry = new DateTime($diploma['geldig_tot']);
-            if ($diploma['is_ingetrokken']) {
-                echo '<span class="badge red">Ingetrokken</span>';
-            } elseif ($diploma['is_verlengd']) {
-                echo '<span class="badge green">Verlengd</span>';
-            } elseif ($expiry < $today) {
-                echo '<span class="badge red">Verlopen</span>';
-            } else {
-                echo '<span class="badge green">Geldig</span>';
-            }
-            ?>
-        </div>
-
         <div class="detail-group"><strong>Behaald door:</strong> <?= htmlspecialchars($diploma['voornaam'] . ' ' . $diploma['achternaam']) ?></div>
         <div class="detail-group"><strong>Geboortedatum:</strong> <?= date('d-m-Y', strtotime($diploma['geboortedatum'])) ?></div>
         <div class="detail-group"><strong>Behaald op:</strong> <?= date('d-m-Y', strtotime($diploma['behaald_datum'])) ?></div>
@@ -72,8 +108,8 @@ $resultaten = $stmt->fetchAll();
             $stmt = $pdo->prepare("SELECT behaald_datum FROM diplomas WHERE id = ?");
             $stmt->execute([$diploma['origineel_diploma_id']]);
             $origineel = $stmt->fetch();
+            echo date('d-m-Y', strtotime($origineel['behaald_datum']));
             ?>
-            <?= date('d-m-Y', strtotime($origineel['behaald_datum'])) ?>
         </div>
         <?php endif; ?>
 
@@ -111,3 +147,5 @@ $resultaten = $stmt->fetchAll();
         <a href="edit.php?id=<?= $diploma['id'] ?>" class="btn">Bewerken</a>
     </div>
 </div>
+</body>
+</html>
