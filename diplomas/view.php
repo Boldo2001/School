@@ -10,7 +10,6 @@ if (!isset($_GET['id'])) {
 
 $diplomaId = $_GET['id'];
 
-// Haal diploma details op
 $query = "
     SELECT d.*, 
            p.voornaam, p.achternaam, p.geboortedatum,
@@ -28,119 +27,87 @@ $diploma = $stmt->fetch();
 
 if (!$diploma) {
     echo '<div class="alert error">Diploma niet gevonden</div>';
-    require_once __DIR__ . '/../includes/footer.php';
     exit;
 }
 
-// Haal resultaten op
 $stmt = $pdo->prepare("SELECT * FROM resultaten WHERE diploma_id = ?");
 $stmt->execute([$diplomaId]);
 $resultaten = $stmt->fetchAll();
 ?>
 
-<h2>Diploma Details</h2>
+<div class="container">
+    <h2>Diploma Details</h2>
 
-<div class="detail-card">
-    <h3><?= htmlspecialchars($diploma['diploma_type_naam']) ?></h3>
-    
-    <div class="detail-row">
-        <div class="detail-group">
-            <label>Diploma Nummer:</label>
-            <p><?= htmlspecialchars($diploma['diploma_nummer']) ?></p>
-        </div>
-        <div class="detail-group">
-            <label>Status:</label>
+    <div class="card" style="margin-bottom: 30px;">
+        <h3><?= htmlspecialchars($diploma['diploma_type_naam']) ?></h3>
+
+        <div class="detail-group"><strong>Diploma Nummer:</strong> <?= htmlspecialchars($diploma['diploma_nummer']) ?></div>
+
+        <div class="detail-group"><strong>Status:</strong>
             <?php 
             $today = new DateTime();
             $expiry = new DateTime($diploma['geldig_tot']);
-            
             if ($diploma['is_ingetrokken']) {
-                echo '<p class="status-badge revoked">Ingetrokken</p>';
+                echo '<span class="badge red">Ingetrokken</span>';
             } elseif ($diploma['is_verlengd']) {
-                echo '<p class="status-badge extended">Verlengd</p>';
+                echo '<span class="badge green">Verlengd</span>';
             } elseif ($expiry < $today) {
-                echo '<p class="status-badge expired">Verlopen</p>';
+                echo '<span class="badge red">Verlopen</span>';
             } else {
-                echo '<p class="status-badge valid">Geldig</p>';
+                echo '<span class="badge green">Geldig</span>';
             }
             ?>
         </div>
+
+        <div class="detail-group"><strong>Behaald door:</strong> <?= htmlspecialchars($diploma['voornaam'] . ' ' . $diploma['achternaam']) ?></div>
+        <div class="detail-group"><strong>Geboortedatum:</strong> <?= date('d-m-Y', strtotime($diploma['geboortedatum'])) ?></div>
+        <div class="detail-group"><strong>Behaald op:</strong> <?= date('d-m-Y', strtotime($diploma['behaald_datum'])) ?></div>
+        <div class="detail-group"><strong>Geldig tot:</strong> <?= date('d-m-Y', strtotime($diploma['geldig_tot'])) ?></div>
+        <div class="detail-group"><strong>Examinateur:</strong> <?= htmlspecialchars($diploma['examinator_naam']) ?> (<?= htmlspecialchars($diploma['examinator_organisatie']) ?>)</div>
+
+        <?php if ($diploma['is_verlengd']): ?>
+        <div class="detail-group">
+            <strong>Origineel behaald op:</strong>
+            <?php 
+            $stmt = $pdo->prepare("SELECT behaald_datum FROM diplomas WHERE id = ?");
+            $stmt->execute([$diploma['origineel_diploma_id']]);
+            $origineel = $stmt->fetch();
+            ?>
+            <?= date('d-m-Y', strtotime($origineel['behaald_datum'])) ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($diploma['is_ingetrokken']): ?>
+        <div class="detail-group"><strong>Reden intrekking:</strong> <?= htmlspecialchars($diploma['intrekking_reden']) ?></div>
+        <?php endif; ?>
     </div>
 
-    <div class="detail-row">
-        <div class="detail-group">
-            <label>Behaald door:</label>
-            <p><?= htmlspecialchars($diploma['voornaam'] . ' ' . $diploma['achternaam']) ?></p>
-        </div>
-        <div class="detail-group">
-            <label>Geboortedatum:</label>
-            <p><?= date('d-m-Y', strtotime($diploma['geboortedatum'])) ?></p>
-        </div>
-    </div>
-
-    <div class="detail-row">
-        <div class="detail-group">
-            <label>Behaald op:</label>
-            <p><?= date('d-m-Y', strtotime($diploma['behaald_datum'])) ?></p>
-        </div>
-        <div class="detail-group">
-            <label>Geldig tot:</label>
-            <p><?= date('d-m-Y', strtotime($diploma['geldig_tot'])) ?></p>
-        </div>
-    </div>
-
-    <div class="detail-group">
-        <label>Examinateur:</label>
-        <p><?= htmlspecialchars($diploma['examinator_naam']) ?> (<?= htmlspecialchars($diploma['examinator_organisatie']) ?>)</p>
-    </div>
-
-    <?php if ($diploma['is_verlengd']): ?>
-    <div class="detail-group">
-        <label>Origineel behaald op:</label>
-        <?php 
-        $stmt = $pdo->prepare("SELECT behaald_datum FROM diplomas WHERE id = ?");
-        $stmt->execute([$diploma['origineel_diploma_id']]);
-        $origineel = $stmt->fetch();
-        ?>
-        <p><?= date('d-m-Y', strtotime($origineel['behaald_datum'])) ?></p>
+    <?php if (!empty($resultaten)): ?>
+    <div class="card">
+        <h3>Resultaten</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Onderdeel</th>
+                    <th>Score</th>
+                    <th>Opmerking</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($resultaten as $resultaat): ?>
+                <tr>
+                    <td><?= htmlspecialchars($resultaat['onderdeel']) ?></td>
+                    <td><?= htmlspecialchars($resultaat['score']) ?></td>
+                    <td><?= htmlspecialchars($resultaat['opmerking']) ?? '-' ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
     </div>
     <?php endif; ?>
 
-    <?php if ($diploma['is_ingetrokken']): ?>
-    <div class="detail-group">
-        <label>Reden intrekking:</label>
-        <p><?= htmlspecialchars($diploma['intrekking_reden']) ?></p>
+    <div style="margin-top: 30px;">
+        <a href="index.php" class="btn">← Terug naar overzicht</a>
+        <a href="edit.php?id=<?= $diploma['id'] ?>" class="btn">Bewerken</a>
     </div>
-    <?php endif; ?>
 </div>
-
-<?php if (!empty($resultaten)): ?>
-<div class="detail-card">
-    <h3>Resultaten</h3>
-    <table class="result-table">
-        <thead>
-            <tr>
-                <th>Onderdeel</th>
-                <th>Score</th>
-                <th>Opmerking</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($resultaten as $resultaat): ?>
-            <tr>
-                <td><?= htmlspecialchars($resultaat['onderdeel']) ?></td>
-                <td><?= htmlspecialchars($resultaat['score']) ?></td>
-                <td><?= htmlspecialchars($resultaat['opmerking']) ?? '-' ?></td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
-<?php endif; ?>
-
-<div class="action-buttons">
-    <a href="index.php" class="btn">Terug naar overzicht</a>
-    <a href="edit.php?id=<?= $diploma['id'] ?>" class="btn">Bewerken</a>
-</div>
-
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
